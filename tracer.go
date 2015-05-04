@@ -13,6 +13,7 @@ import (
 var addr_file string
 var data_file string
 var app_file string
+var out_file string
 var utils_prefix = "m68k-elf-"
 var addr2line = utils_prefix + "addr2line"
 var addr2line_loading = 1000
@@ -83,6 +84,7 @@ func printUsage() {
 }
 
 func init() {
+	flag.StringVar(&out_file, "out", "trace.out", "Destination trace file")
 	flag.Parse()
 	if len(flag.Args()) != 3 {
 		printUsage()
@@ -230,7 +232,13 @@ func main() {
 		}
 		fmt.Printf("Executing addr2line: %d of %d\n",
 			i/addr2line_loading+1, len(unified)/addr2line_loading+1)
-		out, _ := cmd.Output()
+		out, err := cmd.Output()
+		if err != nil {
+			fmt.Println("Execution error: ", err)
+			fmt.Println("CMD: ", cmd.Args)
+			continue
+		}
+		fmt.Printf("outlen: %d", len(out))
 		outstr := fmt.Sprintf("%s", out)
 		outstr = strings.Trim(outstr, "{}")
 		outlist := strings.Split(outstr, "\n")
@@ -239,7 +247,7 @@ func main() {
 		}
 	}
 
-	fo, err := os.Create("trace.out")
+	fo, err := os.Create(out_file)
 	if err != nil {
 		panic(err)
 	}
@@ -247,13 +255,11 @@ func main() {
 	defer fileCloser(fo)
 
 	writer := bufio.NewWriter(fo)
-	fmt_str := "%-12.12[1]s %-12.12[2]s %-12.12[3]s %-12.12[4]s %-12.12[5]s %-12.12[6]s %-12.12[7]s %-12.12[8]s %-12.12[9]s %-12.12[10]s %-12.12[11]s %-12.12[12]s %-12.12[13]s %-12.12[14]s %-12.12[15]s %-12.12[16]s %-12.12[17]s\n"
-	fmt.Fprintf(writer, fmt_str, "pc", "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7")
 	fmt.Println("Starting output")
 	count := 1
 	for _, val := range unified {
 		frame_str := val.Formatted()
-		fmt.Fprintf(writer, "%s\n", frame_str)
+		fmt.Fprintf(writer, "Frame %d of %d\n%s\n", count, len(unified), frame_str)
 		fmt.Printf("Formatting frame %d of %d\n", count, len(unified))
 		count++
 	}
